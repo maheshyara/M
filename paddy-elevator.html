@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Paddy Elevator – 3D Wiring Presentation</title>
+<style>
+:root{box-sizing:border-box;--panel:rgba(15,28,20,.84);--ink:#f2f6ee;--mute:#a9bcab;--gold:#e0a62a;--line:#3a4d3f;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{height:100%;margin:0;background:#cfd8cc;color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow:hidden}
+#c{position:fixed;inset:0;touch-action:none}#c canvas{display:block}
+h1{position:fixed;left:12px;top:calc(8px + env(safe-area-inset-top,0px));margin:0;font-size:15px;background:var(--panel);padding:6px 10px;border-radius:8px}
+#dg{position:fixed;left:12px;top:calc(48px + env(safe-area-inset-top,0px));width:210px;background:var(--panel);border-radius:10px;padding:6px;display:none}
+#hud{position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));max-width:640px;margin:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:11px 13px}
+#cap b{display:block;font-size:16px;color:var(--gold)}#cap span{font-size:13px;line-height:1.35}
+.bar{height:5px;background:var(--line);border-radius:3px;margin:8px 0;overflow:hidden}#pr{height:100%;width:0;background:var(--gold)}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+button{font:600 12px system-ui,sans-serif;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:8px;padding:7px 9px;cursor:pointer}
+button.p{background:var(--gold);border-color:var(--gold);color:#201a08}#tm{margin-left:auto;font-size:12px;color:var(--mute)}
+.lb{position:fixed;left:0;top:0;font:700 11px system-ui;background:#111c;color:#fff;padding:2px 6px;border-radius:5px;pointer-events:none;display:none;white-space:nowrap}
+</style></head><body>
+<div id="c"></div><h1>Paddy Elevator · Wiring & 50 kg Cut-off</h1>
+<svg id="dg" viewBox="0 0 210 190" font-family="system-ui" font-size="10" fill="#fff">
+<g stroke-width="2.5" fill="none"><path d="M45 38V70" stroke="#e33"/><path d="M52 38V70" stroke="#999"/>
+<path d="M105 105H150" stroke="#e33"/><path d="M105 112H150" stroke="#999"/>
+<path d="M20 128V150H70" stroke="#e33"/><path d="M26 128V156H70" stroke="#999"/><path d="M32 128V162H70" stroke="#2c4"/><path d="M38 128V168H70" stroke="#eee"/>
+<path d="M105 78H130V150" stroke="#fc0"/></g>
+<g stroke="#8a9" fill="#183024"><rect x="10" y="10" width="80" height="28" rx="4"/><rect x="20" y="70" width="85" height="58" rx="4"/><rect x="150" y="95" width="52" height="28" rx="4"/><rect x="70" y="145" width="62" height="28" rx="4"/><rect x="118" y="150" width="0" height="0"/></g>
+<g stroke="#8a9" fill="#183024"><rect x="140" y="20" width="62" height="28" rx="4" transform="translate(-12 52)"/></g>
+<text x="18" y="28">24V Battery</text><text x="30" y="102">Controller</text><text x="160" y="112">DC Motor</text><text x="78" y="163">Load cell</text><text x="130" y="86">Display</text>
+<text x="10" y="186" font-size="8" fill="#ccd">red/black: power · red,black,green,white: load cell · yellow: signal</text></svg>
+<div id="hud"><div id="cap"><b></b><span></span></div><div class="bar"><div id="pr"></div></div>
+<div class="row"><button class="p" id="bp">⏸ Pause</button><button id="br">⟲ Restart</button><button id="bs">360° Spin</button><button id="bc">Circuit</button><button id="bm">− Zoom</button><button id="bz">+ Zoom</button><span id="tm"></span></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const T=THREE,host=document.getElementById('c'),V=(x,y,z)=>new T.Vector3(x,y,z);
+const R=new T.WebGLRenderer({antialias:true});R.setPixelRatio(Math.min(devicePixelRatio,2));R.shadowMap.enabled=true;R.setClearColor(0xcfe0e6);host.appendChild(R.domElement);
+const S=new T.Scene();S.fog=new T.Fog(0xcfe0e6,25,60);const cam=new T.PerspectiveCamera(45,1,.1,100);
+S.add(new T.HemisphereLight(0xffffff,0x887766,.85));
+const sun=new T.DirectionalLight(0xffffff,.9);sun.position.set(6,12,8);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-9,right:9,top:9,bottom:-9});sun.shadow.bias=-.0005;S.add(sun);const fl=new T.DirectionalLight(0xbfd8ff,.35);fl.position.set(-6,5,-5);S.add(fl);
+function nz(w,f,fn){const c=document.createElement('canvas');c.width=c.height=w;const x=c.getContext('2d');fn(x,w);const t=new T.CanvasTexture(c);t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(f[0],f[1]);t.anisotropy=8;return t}
+function conc(){return nz(128,[30,30],(x,w)=>{x.fillStyle='#b9b4aa';x.fillRect(0,0,w,w);for(let i=0;i<900;i++){const g=150+Math.random()*60|0;x.fillStyle=`rgb(${g},${g-4},${g-10})`;x.fillRect(Math.random()*w,Math.random()*w,2,2)}})}
+function weave(){return nz(64,[8,4],(x,w)=>{x.fillStyle='#f4f2ea';x.fillRect(0,0,w,w);x.fillStyle='#d6d2c4';for(let i=0;i<w;i+=4){x.fillRect(i,0,1,w);x.fillRect(0,i,w,1)}})}
+{const c=document.createElement('canvas');c.width=2;c.height=256;const x=c.getContext('2d'),g=x.createLinearGradient(0,0,0,256);g.addColorStop(0,'#86b4dc');g.addColorStop(1,'#e6eef0');x.fillStyle=g;x.fillRect(0,0,2,256);S.background=new T.CanvasTexture(c)}
+const M=(c,o={})=>new T.MeshStandardMaterial(Object.assign({color:c,roughness:.5,metalness:.2},o));
+const green=M(0x2e9a2e),steel=M(0xaab2b6,{metalness:.85,roughness:.3}),dark=M(0x161616,{roughness:.7}),red=M(0xd8342a),blue=M(0x1f5fd0),white=M(0xeeeeee,{roughness:.4}),gold=M(0xc9b13a,{metalness:.6});
+function add(g,m,x,y,z,p=S){const o=new T.Mesh(g,m);o.position.set(x,y,z);o.castShadow=o.receiveShadow=true;p.add(o);return o}
+const bx=(w,h,d)=>new T.BoxGeometry(w,h,d),cy=(r,h,s=32)=>new T.CylinderGeometry(r,r,h,s);
+function tex(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;const t=new T.CanvasTexture(c);t.anisotropy=8;t.minFilter=T.LinearFilter;t.generateMipmaps=false;return{c:c.getContext('2d'),t}}
+const gnd=add(new T.PlaneGeometry(80,80),M(0xb9b4aa,{roughness:.9,map:conc()}),0,0,0);gnd.rotation.x=-Math.PI/2;gnd.castShadow=false;
+// frame & wheels
+const A=new T.Vector2(-3,.6),B=new T.Vector2(1.2,3.7),L=A.distanceTo(B),ang=Math.atan2(B.y-A.y,B.x-A.x);
+[-.5,.5].forEach(z=>{add(bx(4.6,.12,.12),green,-1.1,.45,z);add(bx(.12,2.8,.12),green,.7,1.85,z);
+ const s=add(bx(L+.2,.1,.1),green,(A.x+B.x)/2,(A.y+B.y)/2-.3,z);s.rotation.z=ang});
+add(bx(.12,.12,1.1),green,.7,3.3,0);add(bx(.12,.12,1.1),green,-1.4,.45,0);add(bx(.12,.12,1.1),green,.7,.45,0);add(bx(.1,.8,.1),green,.65,3.7,.2);
+[-2.4,.4].forEach(x=>[-.68,.68].forEach(z=>{add(new T.TorusGeometry(.36,.09,12,40),M(0x0e0e0e,{roughness:.9}),x,.42,z);add(cy(.36,.2),dark,x,.42,z).rotation.x=Math.PI/2;add(cy(.22,.26),red,x,.42,z).rotation.x=Math.PI/2;add(cy(.06,.3),steel,x,.42,z).rotation.x=Math.PI/2}));
+// tube + auger ribbon
+const tg=new T.Group();tg.position.set(A.x,A.y,0);tg.rotation.z=ang;S.add(tg);
+const tube=add(cy(.2,L,40),M(0xc8dde6,{transparent:true,opacity:.25,metalness:.3,roughness:.1,side:T.DoubleSide}),L/2,0,0,tg);tube.rotation.z=Math.PI/2;tube.castShadow=false;
+const aug=new T.Group();tg.add(aug);
+{const p=[],ix=[],n=240;for(let i=0;i<=n;i++){const a=i*.26,x=i/n*L;p.push(x,Math.cos(a)*.05,Math.sin(a)*.05,x,Math.cos(a)*.185,Math.sin(a)*.185);if(i<n){const k=i*2;ix.push(k,k+1,k+2,k+1,k+3,k+2)}}
+ const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(p,3));g.setIndex(ix);g.computeVertexNormals();add(g,M(0x9aa3a8,{metalness:.8,roughness:.35,side:T.DoubleSide}),0,0,0,aug)}
+add(cy(.05,L+.3,12),steel,L/2,0,0,aug).rotation.z=Math.PI/2;
+// motor (black can + silver gearbox), chain & sprockets
+add(cy(.17,.6),M(0x101010,{roughness:.4}),.6,4.15,.2).rotation.z=Math.PI/2;
+add(bx(.3,.3,.3),M(0x9a9ea2,{metalness:.7,roughness:.45}),1.0,4.15,.22);add(cy(.04,.45),steel,1.0,4.15,.4).rotation.x=Math.PI/2;
+const sp1=add(cy(.125,.05,10),gold,1.0,4.15,.4);sp1.rotation.x=Math.PI/2;
+const sp2=add(cy(.235,.05,18),steel,1.2,3.7,.4);sp2.rotation.x=Math.PI/2;
+add(bx(.3,.3,.3),M(0x777c80,{metalness:.7}),1.2,3.72,0);add(cy(.03,.45),steel,1.2,3.7,.22).rotation.x=Math.PI/2;
+{const q=[];for(const[c,r]of[[[1,4.15],.125],[[1.2,3.7],.235]])for(let i=0;i<24;i++){const a=i/24*6.283;q.push([c[0]+Math.cos(a)*r*1.06,c[1]+Math.sin(a)*r*1.06])}
+ q.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);const cr=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);const h=[];
+ for(const p of q){while(h.length>1&&cr(h[h.length-2],h[h.length-1],p)<=0)h.pop();h.push(p)}const lo=h.length;
+ for(let i=q.length-2;i>=0;i--){const p=q[i];while(h.length>lo&&cr(h[h.length-2],h[h.length-1],p)<=0)h.pop();h.push(p)}h.pop();
+ add(new T.TubeGeometry(new T.CatmullRomCurve3(h.map(p=>V(p[0],p[1],.4)),true),160,.017,6,true),dark,0,0,0)}
+add(cy(.17,.9),steel,1.45,3.3,0).rotation.z=.9;
+// controller (canvas front)
+const ct=tex(256,256);add(bx(.72,.72,.25),M(0x1e2428),.45,1.7,.62);
+const cp=add(new T.PlaneGeometry(.66,.66),new T.MeshBasicMaterial({map:ct.t,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}),.45,1.7,.752);
+function drawC(w,on){const c=ct.c;c.fillStyle='#14181b';c.fillRect(0,0,256,256);c.fillStyle='#b8d3de';c.fillRect(14,12,228,56);
+ c.fillStyle='#123';c.font='bold 22px monospace';c.fillText('WT '+w.toFixed(1)+' kg',22,38);c.fillText(on?'MOTOR RUN':'CUT-OFF 50kg',22,62);
+ c.fillStyle='#2a0505';c.fillRect(24,80,208,58);c.fillStyle='#ff3030';c.font='bold 46px monospace';c.fillText(w.toFixed(1).padStart(5,'0'),50,126);
+ [0,1,2,3].forEach(i=>{c.fillStyle='#eee';c.fillRect(20+i*58,150,46,36);c.fillStyle=i==3?'#1a9a44':'#eee';c.fillRect(20+i*58,200,46,36);c.fillStyle='#222';c.font='bold 14px sans-serif';
+  c.fillText(['▲','▼','◀','↵'][i],34+i*58,174);c.fillText(['TARE','F1','F2','RUN'][i],26+i*58,224)});ct.t.needsUpdate=true}
+// battery
+const bt=tex(256,128);add(bx(.8,.46,.5),M(0x0c0c0c,{roughness:.35}),-.1,.8,0);add(bx(.7,.06,.44),M(0x0c0c0c),-.1,1.06,0);
+bt.c.fillStyle='#0b5a2a';bt.c.fillRect(0,0,256,128);bt.c.fillStyle='#fff';bt.c.font='bold 30px sans-serif';bt.c.fillText('PowerBrick',14,40);bt.c.font='bold 34px sans-serif';bt.c.fillStyle='#6cf';bt.c.fillText('24V 32Ah',14,84);bt.c.fillStyle='#ddd';bt.c.font='15px sans-serif';bt.c.fillText('LiFePO4 · 25.6V',14,112);bt.t.needsUpdate=true;
+add(new T.PlaneGeometry(.7,.32),new T.MeshBasicMaterial({map:bt.t,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}),-.1,.78,.258);
+add(cy(.045,.07),red,-.3,1.12,.15);add(cy(.045,.07),gold,0,1.12,.15);
+// scale: base, load cells, stainless platform, indicator
+add(bx(1.7,.07,1.5),M(0x444a4e,{metalness:.5}),1.8,.2,0);[-.75,.75].forEach(x=>[-.65,.65].forEach(z=>add(cy(.05,.1),dark,1.8+x,.07,z)));
+const lc=M(0xd5d9dc,{metalness:.9,roughness:.25});[-.6,.6].forEach(z=>{add(bx(.5,.09,.09),lc,1.8,.29,z);add(cy(.022,.1,10),dark,1.7,.29,z).rotation.x=Math.PI/2});
+add(bx(1.6,.08,1.4),M(0xbfc4c8,{metalness:.95,roughness:.22}),1.8,.38,0);
+
+add(cy(.045,1.1),white,2.95,.75,.75);add(bx(.7,.34,.3),white,2.95,1.35,.75);
+const it=tex(256,100);add(new T.PlaneGeometry(.56,.2),new T.MeshBasicMaterial({map:it.t,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}),2.95,1.38,.914);
+function drawI(w){const c=it.c;c.fillStyle='#021';c.fillRect(0,0,256,100);c.fillStyle='#2f6';c.font='bold 70px monospace';c.fillText(w.toFixed(3),6,76);it.t.needsUpdate=true}
+add(new T.TubeGeometry(new T.CatmullRomCurve3([V(2.7,.45,-.2),V(2.7,.9,-.2),V(2.7,.9,.2),V(2.7,.45,.2)]),20,.02,6),white,0,0,0);
+const bag=add(new T.CylinderGeometry(.62,.55,1.6,32,1,true),M(0xf4f2ea,{side:T.DoubleSide,roughness:.95,map:weave()}),1.8,1.22,0);
+add(cy(.55,.04),M(0xf4f2ea),1.8,.44,0);add(new T.TorusGeometry(.6,.05,8,32),M(0xf4f2ea,{roughness:.95}),1.8,2.02,0).rotation.x=Math.PI/2;
+const pile=add(new T.ConeGeometry(.55,1,24),M(0xe3b323,{roughness:.7}),1.8,.45,0);pile.scale.y=.01;
+add(new T.ConeGeometry(.9,.6,24),M(0xe3b323,{roughness:.8}),-3.3,.3,0).scale.x=1.2;
+// wires
+const pulses=[];
+function wire(pts,col,pc,on){const c=new T.CatmullRomCurve3(pts.map(p=>V(...p)));add(new T.TubeGeometry(c,70,.013,6),M(col,{roughness:.6}),0,0,0);
+ if(pc){const m=new T.Mesh(new T.SphereGeometry(.04,8,8),new T.MeshBasicMaterial({color:pc}));S.add(m);pulses.push({c,m,t:Math.random(),on})}}
+wire([[-.3,1.14,.15],[-.3,1.4,.4],[.25,1.3,.62],[.25,1.35,.75]],0xdd2222,0xff8888,'m');
+wire([[0,1.14,.15],[.05,1.4,.4],[.4,1.3,.62],[.4,1.35,.75]],0x111111,0xaaaaaa,'m');
+wire([[.35,2.07,.74],[.55,2.6,.6],[.45,3.6,.4],[.3,4.1,.28]],0xdd2222,0xff8888,'m');
+wire([[.5,2.07,.74],[.62,2.6,.55],[.5,3.6,.36],[.32,4.12,.3]],0x111111,0xaaaaaa,'m');
+[[0xdd2222,0],[0x111111,.02],[0x22cc44,.04],[0xffffff,.06]].forEach(([c,o])=>wire([[1.68,.29,.66+o],[1.4,.15,.95],[.9,.12,.9+o],[.62,.9,.75],[.55+o,1.3,.75]],c,c==0x22cc44?0x88ff99:c==0xffffff?0xffffff:0,'a'));
+wire([[.75,1.8,.7],[1.5,1.7,1.0],[2.5,1.0,1.1],[2.9,1.2,.9]],0xf0c020,0xffee66,'a');
+const nodes=[['24V Battery',-.1,1.15,.2],['Controller',.45,2.15,.7],['Motor',.6,4.4,.2],['Load cell',1.8,.4,.65],['Display',2.95,1.65,.75],['Auger',-1,1.9,.3]];
+const lbs=nodes.map(n=>{const d=document.createElement('div');d.className='lb';d.textContent=n[0];document.body.appendChild(d);return d});
+// grains
+const N=430,G=new T.InstancedMesh(new T.SphereGeometry(.035,6,5),M(0xe8b92a,{roughness:.6}),N);G.castShadow=true;S.add(G);
+const gs=[];for(let i=0;i<N;i++)gs.push({s:0,u:0,x:0,y:0,z:0,vx:0,vy:0,oy:0,oz:0});
+const dm=new T.Object3D(),cs=Math.cos(ang),sn=Math.sin(ang);
+let dirty=0,dd=0,spawned=0,landed=0,acc=0,phase='run',pt=0,weight=0,motorOn=true;
+function disp(){drawC(weight,motorOn);drawI(weight)}
+function sim(dt){pt+=dt;dd+=dt;if(dirty&&dd>.25){dd=0;dirty=0;disp()}
+ if(phase==='run'){acc+=dt*16;while(acc>=1&&spawned<400){acc--;const g=gs.find(q=>!q.s);if(!g)break;g.s=1;g.u=0;g.oy=(Math.random()-.3)*.14;g.oz=(Math.random()-.5)*.24;spawned++}
+  aug.rotation.x+=dt*5;sp1.rotation.y+=dt*6;sp2.rotation.y+=dt*3}
+ gs.forEach((g,i)=>{if(g.s===1){g.u+=dt*.2;const lx=g.u*L;g.x=A.x+lx*cs-g.oy*sn;g.y=A.y+lx*sn+g.oy*cs;g.z=g.oz*.8;
+   if(g.u>=1){g.s=2;g.x=1.7;g.y=3.0;g.vx=.5+Math.random()*.3;g.vy=-.2;g.z*=.5}}
+  else if(g.s===2){g.vy-=9.8*dt;g.x+=g.vx*dt;g.y+=g.vy*dt;g.vx*=.99;g.x=Math.min(Math.max(g.x,1.4),2.2);
+   if(g.y<.47+weight/50*1.15){g.s=0;landed++;weight=Math.min(50,landed*.125);dirty=1}}
+  if(g.s){dm.position.set(g.x,g.y,g.z);dm.rotation.z=i}else dm.position.set(0,-9,0);dm.updateMatrix();G.setMatrixAt(i,dm.matrix)});
+ G.instanceMatrix.needsUpdate=true;const f=weight/50;pile.scale.y=Math.max(.01,f*1.15);pile.position.y=.44+pile.scale.y*.5;
+ pulses.forEach(p=>{const live=p.on==='a'||motorOn;p.m.visible=live;if(live){p.t=(p.t+dt*.35)%1;p.m.position.copy(p.c.getPoint(p.t))}});
+ if(phase==='run'&&landed>=400){phase='hold';pt=0;motorOn=false;disp()}
+ else if(phase==='hold'&&pt>7){phase='swap';pt=0;weight=0;landed=0;spawned=0;gs.forEach(g=>g.s=0);disp()}
+ else if(phase==='swap'&&pt>1.5){phase='run';pt=0;motorOn=true;disp()}}
+disp();
+const K=[[0,20,16,15,0,1.8,0,'Paddy Elevator','Battery-powered auger elevator with automatic 50 kg bag cut-off.',0],
+[10,380,20,15,0,1.8,0,'360° Walk-around','Frame, wheels, auger tube, scale and bag — all connected by wiring.',0],
+[22,20,15,3.6,0,1,.3,'24V 32Ah LiFePO4 battery','Red (+) and black (−) wires feed the controller.',1],
+[32,10,8,3.2,.45,1.7,.6,'Weighing controller','Reads the load cell, shows weight, and switches the motor.',1],
+[42,35,12,3.4,.9,4,.3,'12V geared DC motor','Controller output wires drive the motor; chain turns the auger.',1],
+[52,25,25,5.5,-1,2,0,'Screw auger in Ø180 mm tube','Paddy rises along the flights to the discharge outlet.',0],
+[60,25,18,4.2,1.8,.5,.4,'Load cell & platform scale','4-wire load cell: red, black, green, white signals.',1],
+[70,30,20,9,1.1,1.8,.4,'Circuit connections','Battery → controller → motor; load cell → controller → display.',1],
+[82,400,18,13,.5,1.8,0,'Auto cut-off at 50 kg','At 50.0 kg the controller cuts power to the motor.',0],
+[90,380,18,15,0,1.8,0,'','',0]];
+const TL=90;let t=0,playing=true,manual=false,spin=0,zoomK=1,spinAnim=0,circ=false,flag=0;
+const st={az:20,el:16,d:15,tx:0,ty:1.8,tz:0},sm=x=>x*x*(3-2*x),$=id=>document.getElementById(id);
+function tour(){let i=0;while(i<K.length-2&&t>=K[i+1][0])i++;const a=K[i],b=K[i+1],k=sm(Math.min(1,Math.max(0,(t-a[0])/(b[0]-a[0]))));
+ const l=j=>a[j]+(b[j]-a[j])*k;st.az=l(1);st.el=l(2);st.d=l(3);st.tx=l(4);st.ty=l(5);st.tz=l(6);flag=a[9];
+ const c=$('cap');if(a[7]!==c.firstChild.textContent){c.firstChild.textContent=a[7];c.lastChild.textContent=a[8]}}
+function place(){const az=(st.az+spin)*Math.PI/180,el=st.el*Math.PI/180,d=st.d*zoomK;
+ cam.position.set(st.tx+d*Math.sin(az)*Math.cos(el),st.ty+d*Math.sin(el),st.tz+d*Math.cos(az)*Math.cos(el));cam.lookAt(st.tx,st.ty,st.tz)}
+const P=new Map();let pd=0;
+host.addEventListener('pointerdown',e=>{host.setPointerCapture(e.pointerId);P.set(e.pointerId,e);if(P.size===2){const[a,b]=[...P.values()];pd=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)}});
+host.addEventListener('pointermove',e=>{if(!P.has(e.pointerId))return;const o=P.get(e.pointerId);
+ if(P.size===1){takeover();st.az-=(e.clientX-o.clientX)*.4;st.el=Math.min(85,Math.max(2,st.el+(e.clientY-o.clientY)*.3))}
+ P.set(e.pointerId,e);if(P.size===2){const[a,b]=[...P.values()];const n=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);takeover();zoomK=Math.min(3,Math.max(.2,zoomK*pd/n));pd=n}});
+['pointerup','pointercancel'].forEach(n=>host.addEventListener(n,e=>P.delete(e.pointerId)));
+host.addEventListener('wheel',e=>{e.preventDefault();takeover();zoomK=Math.min(3,Math.max(.2,zoomK*(1+e.deltaY*.001)))},{passive:false});
+function takeover(){if(!manual){manual=true;$('bp').textContent='▶ Resume tour'}}
+$('bp').onclick=()=>{if(manual){manual=false;playing=true;zoomK=1;spin=0}else playing=!playing;$('bp').textContent=playing&&!manual?'⏸ Pause':'▶ Play'};
+$('br').onclick=()=>{t=0;manual=false;playing=true;zoomK=1;spin=0;$('bp').textContent='⏸ Pause'};
+$('bs').onclick=()=>{manual=false;playing=false;$('bp').textContent='▶ Play';spinAnim=360};
+$('bc').onclick=()=>{circ=!circ};$('bz').onclick=()=>{takeover();zoomK=Math.max(.2,zoomK*.8)};$('bm').onclick=()=>{takeover();zoomK=Math.min(3,zoomK*1.25)};
+function resize(){R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()}addEventListener('resize',resize);resize();
+let last=performance.now();
+function loop(now){const dt=Math.min(.05,(now-last)/1000);last=now;
+ if(playing&&!manual){t+=dt;if(t>=TL)t=0}
+ if(spinAnim>0){const s=Math.min(spinAnim,dt*45);spin+=s;spinAnim-=s;if(spinAnim<=0)spin=0}
+ if(!manual)tour();sim(dt);place();
+ const show=circ||(!manual&&flag);$('dg').style.display=show?'block':'none';
+ lbs.forEach((d,i)=>{d.style.display=show?'block':'none';if(show){const v=V(nodes[i][1],nodes[i][2],nodes[i][3]).project(cam);
+  if(v.z>1){d.style.display='none';return}d.style.transform=`translate(${(v.x*.5+.5)*innerWidth-20}px,${(-v.y*.5+.5)*innerHeight}px)`}});
+ $('pr').style.width=(t/TL*100)+'%';const m=Math.floor(t);$('tm').textContent=Math.floor(m/60)+':'+String(m%60).padStart(2,'0')+' / 1:30';
+ R.render(S,cam);requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+</script></body></html>
